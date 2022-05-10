@@ -1,18 +1,21 @@
 library(deSolve)
 library(tidyverse)
 library(plotly)
+library(beepr)
 
 
-# Read flat file
+# Read flat file Health Survey data
 
-df <- read.csv("C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Data\\calorie_deficit_scenarios.csv", sep = ",", fileEncoding="UTF-8-BOM")
+df <- read.csv("C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Data\\calorie_deficit_scenarios_w_imd.csv", sep = ",", fileEncoding="UTF-8-BOM")
 
 # Recode sex
 
 df$Sex_letter <- ifelse(df$Sex == "female", "F", "M")
 
-funScenario <- function(w0, height, sex, age, CalRedShare, days){
+# Define function that takes in calorie reduction as a percentage 
 
+funScenario <- function(id, w0, height, sex, age, CalRedShare, days){
+  
 EI0 <- if_else(sex == "M", 
                -.0971*(w0^2) + 40.853*w0 + 323.59,
                .0278*(w0^2) + 9.2893*w0 + 1528.9) # at baseline
@@ -103,7 +106,8 @@ out_pars <- c(C = C,
 
 out <- as.data.frame(SolveFF(out_pars, tout)) %>% 
   tail(n=1) %>% 
-  mutate(FFM = 10.4*log(f/C),
+  mutate(X = id,
+         FFM = 10.4*log(f/C),
          finalWeight = f + FFM,
          startWeight = w0,
          sex = sex,
@@ -114,79 +118,118 @@ out <- as.data.frame(SolveFF(out_pars, tout)) %>%
 return(out)
 }
 
+
 # evaluate function for different scenarios
 # merge with initial data
 
 # 10% reduction
 
+start_time <- Sys.time()
 reduction_10 <- do.call("rbind", mapply(funScenario, 
+                                        id = df$X, 
                                         w0 =df$Wt_est, 
                                         height = df$Ht_est, 
                                         sex = df$Sex_letter, 
                                         age = df$Age_est, 
                                         CalRedShare = 0.1, 
-                                        days = 365, 
+                                        days = 365*3, 
                                         SIMPLIFY = F)) %>% 
-  merge(df, ., 
-        by.y = c("sex", "height", "age", "startWeight"), 
-        by.x = c("Sex_letter", "Ht_est", "Age_est", "Wt_est")) %>% 
+  merge(df, by = "X") %>% 
   mutate(final_BMI = finalWeight/Ht_est/Ht_est*10000,
          final_BMI_class = cut(final_BMI, 
                                c(0, 18.5, 24.9, 29.9, 100), 
-                               labels = c("underweight", "normal", "overweight", "obese")))
+                               labels = c("underweight", "normal", "overweight", "obese"))) 
+
+end_time <- Sys.time()
+
+end_time - start_time
+
+beep(3)
+
+
+
 
 # 15% reduction
 
+start_time <- Sys.time()
+
 reduction_15 <- do.call("rbind", mapply(funScenario, 
+                                        id = df$X,
                                         w0 =df$Wt_est, 
                                         height = df$Ht_est, 
                                         sex = df$Sex_letter, 
                                         age = df$Age_est, 
                                         CalRedShare = 0.15, 
-                                        days = 365, 
+                                        days = 365*3, 
                                         SIMPLIFY = F)) %>% 
-  merge(df, ., 
-        by.y = c("sex", "height", "age", "startWeight"), 
-        by.x = c("Sex_letter", "Ht_est", "Age_est", "Wt_est")) %>% 
+  merge(df, by = "X") %>%
   mutate(final_BMI = finalWeight/Ht_est/Ht_est*10000,
          final_BMI_class = cut(final_BMI, 
                                c(0, 18.5, 24.9, 29.9, 100), 
                                labels = c("underweight", "normal", "overweight", "obese")))
 
+end_time <- Sys.time()
+
+end_time - start_time
+
+beep(3)
+
 # 20% reduction
 
+start_time <- Sys.time()
+
 reduction_20 <- do.call("rbind", mapply(funScenario, 
+                                        id = df$X,
                                         w0 =df$Wt_est, 
                                         height = df$Ht_est, 
                                         sex = df$Sex_letter, 
                                         age = df$Age_est, 
                                         CalRedShare = 0.20, 
-                                        days = 365, 
+                                        days = 365*3, 
                                         SIMPLIFY = F)) %>% 
-  merge(df, ., 
-        by.y = c("sex", "height", "age", "startWeight"), 
-        by.x = c("Sex_letter", "Ht_est", "Age_est", "Wt_est")) %>% 
+  merge(df, by = "X") %>%
   mutate(final_BMI = finalWeight/Ht_est/Ht_est*10000,
          final_BMI_class = cut(final_BMI, 
                                c(0, 18.5, 24.9, 29.9, 100), 
                                labels = c("underweight", "normal", "overweight", "obese")))
 
+end_time <- Sys.time()
+
+end_time - start_time
+
+beep(3)
+
 # 25% reduction
 
+start_time <- Sys.time()
+
 reduction_25 <- do.call("rbind", mapply(funScenario, 
+                                        id = df$X,
                                         w0 =df$Wt_est, 
                                         height = df$Ht_est, 
                                         sex = df$Sex_letter, 
                                         age = df$Age_est, 
                                         CalRedShare = 0.25, 
-                                        days = 365, 
+                                        days = 365*3, 
                                         SIMPLIFY = F)) %>% 
-  merge(df, ., 
-        by.y = c("sex", "height", "age", "startWeight"), 
-        by.x = c("Sex_letter", "Ht_est", "Age_est", "Wt_est")) %>% 
+  merge(df, by = "X") %>%
   mutate(final_BMI = finalWeight/Ht_est/Ht_est*10000,
          final_BMI_class = cut(final_BMI, 
                                c(0, 18.5, 24.9, 29.9, 100), 
                                labels = c("underweight", "normal", "overweight", "obese")))
 
-ggplot(reduction_25, aes(x = Wt_est, y = finalWeight, color = Age_group)) + geom_point()
+end_time <- Sys.time()
+
+end_time - start_time
+
+beep(3)
+
+# save files as csv
+
+write_csv(reduction_10, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_modelling_3years_10percent.csv")
+
+write_csv(reduction_15, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_modelling_3years_15percent.csv")
+
+write_csv(reduction_20, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_modelling_3years_20percent.csv")
+
+write_csv(reduction_25, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_modelling_3years_25percent.csv")
