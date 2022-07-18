@@ -6,17 +6,54 @@ library(beepr)
 
 # Read flat file
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+df <- read.csv("C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Data\\calorie_deficit_scenarios_filter.csv", sep = ",", fileEncoding="UTF-8-BOM") %>% 
+  filter(BMI_class != "underweight")
+=======
 df <- read.csv("/Users/fausto/Downloads/calorie_deficit_scenarios_w_imd.csv", sep = ",", fileEncoding="UTF-8-BOM")
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+df <- read.csv("/Users/fausto/Downloads/calorie_deficit_scenarios_w_imd.csv", sep = ",", fileEncoding="UTF-8-BOM")
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
 
 # Recode sex
 
 df$Sex_letter <- ifelse(df$Sex == "female", "F", "M")
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+# Define target weight by gender and BMI class
+
+
+# mean weight change
+
+w_change <- read.csv("C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Data\\weight_change_table_mean.csv") %>% 
+  dplyr::select(bmi_class, female, male) %>% 
+  melt(.)
+
+dat <- merge(df, w_change, by.x = c("BMI_class", "Sex"), by.y = c("bmi_class", "variable")) %>% 
+  mutate(target = Wt_est*(1 - value/100))
+
+
+
+funScenario <- function(id, w0, height, sex, age, w1, days){
+  
+  bmi <- w0/height/height*10000
+  
+  EI0 <- if_else(sex == "M",
+=======
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
 funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
   
   bmi <- w0/height/height*10000
   
   EI0 <- if_else(sex == "M", 
+<<<<<<< HEAD
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
                  -.0971*(w0^2) + 40.853*w0 + 323.59,
                  .0278*(w0^2) + 9.2893*w0 + 1528.9) # at baseline
   
@@ -24,7 +61,15 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
   y1 <- if_else(sex == "M",5.92,5.09)
   p <- if_else(sex == "M",.4330,.4356)
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+  RMR0 <- a1*(w0^(p))-y1*(age)
+=======
   RMR0 <- a1*(w0^(p))-y1*(age + days/365)
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+  RMR0 <- a1*(w0^(p))-y1*(age + days/365)
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
   
   a <- 0.02                       # adaption parameter
   
@@ -50,8 +95,20 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
   F0 <-  Re(res[1])
   FFM0 <- w0 - F0
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+  
+  tout <- (seq(0, days, by = days/30)) # calculate 2 month intervals (approximately)
+  
+  CalRedShare <- seq(0.01,0.30,by=0.01)  # List of potential calorie reduction values
+=======
   if (calibration == T){  
   CalRedShare <- seq(0.05,0.70,by=0.01)  # List of potential calorie reduction values
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+  if (calibration == T){  
+  CalRedShare <- seq(0.05,0.70,by=0.01)  # List of potential calorie reduction values
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
 
   funSelect <- function(x) {
     Cr <- EI0*x            # Updated calorie intake
@@ -67,7 +124,14 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
     cl <- 1020                       # energy in 1kg of lean muscle
     cf <- 9500                       # energy in 1kg of fat
     
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
     # initial fat mass   
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+    # initial fat mass   
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
     SolveFF <- function(pars, times=tout) { 
       derivs <- function(t, state, parameters){
         with(as.list(c(state, parameters)), {
@@ -94,7 +158,15 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
                  method = rk4))
     }
     
+<<<<<<< HEAD
+<<<<<<< HEAD
+    
+=======
     tout <- (seq(0, days, by = 1))
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+    tout <- (seq(0, days, by = 1))
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
     out_pars <- c(C = C,
                   CC = CC,
                   EI0 = EI0,
@@ -109,6 +181,13 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
                   DIT0 = DIT0
     )
     
+<<<<<<< HEAD
+<<<<<<< HEAD
+    
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
     out <- as.data.frame(SolveFF(out_pars, tout)) %>% 
       mutate(FFM = 10.4*log(f/C),
              weight = f + FFM,
@@ -119,17 +198,39 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
     tail(out,1)
   }
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+
+    optimCal <- pmap_dfr(list(CalRedShare), funSelect) %>%
+      filter(abs(weight - tarW) == min(abs(weight - tarW)))
+
+    finalCal <- optimCal$cal
+
+=======
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
     optimCal <- do.call("rbind", lapply(CalRedShare, funSelect)) %>%
       filter(abs(weight - tarW) == min(abs(weight - tarW)))   
     finalCal <- optimCal$cal
   } else {
     finalCal <- ifelse(w0 == w1, 0.05, -1.274392 + 0.0597815956*bmi+-0.0004652386*bmi*bmi)
   }
+<<<<<<< HEAD
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
 
 
   Cr <- EI0*finalCal               # Calorie reduction
   NI1 <- EI0 - Cr                  # New energy intake 
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+  
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
   C = F0 * 1/exp(FFM0/10.4)        # Estimate the constant of the Forbes Equation
   
   CC <- SPA0 - 2*(RMR0+PA0+DIT0)   # Determine constant of integration (note that s = 0.67 )
@@ -139,7 +240,14 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
   cl <- 1020                       # energy in 1kg of lean muscle
   cf <- 9500                       # energy in 1kg of fat
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
   # initial fat mass   
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+  # initial fat mass   
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
   SolveFF <- function(pars, times=tout) { 
     derivs <- function(t, state, parameters){
       with(as.list(c(state, parameters)), {
@@ -166,7 +274,15 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
                method = rk4))
   }
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+  
+=======
   tout <- (seq(0, days, by = 1))
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+  tout <- (seq(0, days, by = 1))
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
   out_pars <- c(C = C,
                 CC = CC,
                 EI0 = EI0,
@@ -181,11 +297,32 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
                 DIT0 = DIT0
   )
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+  
+  # try and merge the two functions so that they report all output variables at once
+  
+  out <- as.data.frame(SolveFF(out_pars, tout)) %>% 
+    # tail(n=1) %>% 
+    mutate(X = id,
+           FFM = 10.4*log(f/C),
+           finalWeight = f + FFM,
+           startWeight = w0,
+           sex = sex,
+           height = height,
+           age = age)
+=======
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
   out <- as.data.frame(SolveFF(out_pars, tout)) %>% 
     mutate(FFM = 10.4*log(f/C),
            weight = f + FFM,
            calRed = finalCal) %>% 
     filter(time == days)
+<<<<<<< HEAD
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
   
   derivs <- function(t, state, parameters){
     with(as.list(c(state, parameters)), {
@@ -211,6 +348,14 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
     }) 
   }
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+  
+  
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
   state <- c(f=F0) 
   finalPar <- ode(y = state,
                   times = tout,
@@ -218,6 +363,58 @@ funScenario <- function(id, w0, height, sex, age, w1, days, calibration){
                   parms = out_pars,
                   method = rk4)
   
+<<<<<<< HEAD
+<<<<<<< HEAD
+  
+  final <- merge(out, finalPar, by = c("time", "f"))   %>%          # merge
+    mutate(diff = abs(EExp - newIntake))  %>%                         # difference between new intake and TEE
+    mutate(thisMin = diff == min(diff))  %>%                          # minimum value of the difference, this is the time when weight is achieved
+    arrange(time)  %>%                                                # sort by time
+    mutate(cum = cumsum(thisMin))  %>%                                # flag all times after weight is achieved
+    mutate(TEE_final = ifelse(time == 0, baseIntake, ifelse(cum == 1, newIntake, EExp)))             # update TEE so that is becomes stable after achieving target weight
+  
+  newWeight <- (final  %>% filter(thisMin == T))$finalWeight             # target weight
+  dayAchieve <- (final  %>% filter(thisMin == T))$time              # day target weight is achieved
+  
+  finalOut <- final  %>% 
+    mutate(weight_final = ifelse(cum == 1, cum*newWeight, startWeight))  %>%  # add target weight
+    mutate(intake_final = ifelse(time == 0, baseIntake, newIntake))  %>% # update intake at day 0 it is the TEE
+    mutate(day_final = dayAchieve)  %>% 
+    mutate(bmi_final = weight_final/height/height*10000) %>% 
+    tail(1)
+  
+  return(finalOut)
+  
+  # return(final)
+}
+
+
+
+###############################################################################
+# FULL SAMPLE
+###############################################################################
+
+dat_obese <- dat %>% filter(BMI_class == "obese") 
+
+list <- list(id = dat_obese$X,
+             w0 =dat_obese$Wt_est, 
+             height = dat_obese$Ht_est, 
+             sex = dat_obese$Sex_letter, 
+             age = dat_obese$Age_est, 
+             w1 = dat_obese$target, 
+             days = 365*5 )
+
+
+start_time <- Sys.time()
+obese <- pmap_dfr(list, funScenario) %>% 
+  merge(., dat_obese, by = "X") %>% 
+  mutate(final_BMI_class = cut(bmi_final, 
+                               c(0, 18.5, 24.9, 29.9, 100), 
+                               labels = c("underweight", "normal", "overweight", "obese"))) %>% 
+  mutate(calRed = (newIntake - baseIntake)/baseIntake)
+=======
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
   final <- merge(out, finalPar, by = c("time", "f"))  %>% mutate(id = id)
   
   return(final)
@@ -436,6 +633,10 @@ scenario4 <- do.call("rbind", mapply(funScenario,
          final_BMI_class = cut(final_BMI, 
                                c(0, 18.5, 24.9, 29.9, 100), 
                                labels = c("underweight", "normal", "overweight", "obese")))
+<<<<<<< HEAD
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
 
 end_time <- Sys.time()
 
@@ -444,6 +645,72 @@ end_time - start_time
 beep(3)
 
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+write_csv(obese, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_obese_weight_loss.csv")
+
+
+dat_over <- dat %>% filter(BMI_class == "overweight")
+
+list <- list(id = dat_over$X,
+             w0 =dat_over$Wt_est, 
+             height = dat_over$Ht_est, 
+             sex = dat_over$Sex_letter, 
+             age = dat_over$Age_est, 
+             w1 = dat_over$target, 
+             days = 365*5 )
+
+start_time <- Sys.time()
+over <- pmap_dfr(list, funScenario)%>% 
+  merge(., dat_over, by = "X") %>% 
+  mutate(final_BMI_class = cut(bmi_final, 
+                               c(0, 18.5, 24.9, 29.9, 100), 
+                               labels = c("underweight", "normal", "overweight", "obese"))) %>% 
+  mutate(calRed = (newIntake - baseIntake)/baseIntake)
+
+end_time <- Sys.time()
+
+end_time - start_time
+
+beep(3)
+
+write_csv(over, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_over_weight_loss.csv")
+
+dat_norm <- dat %>% filter(BMI_class == "normal")
+
+list <- list(id = dat_norm$X,
+             w0 =dat_norm$Wt_est, 
+             height = dat_norm$Ht_est, 
+             sex = dat_norm$Sex_letter, 
+             age = dat_norm$Age_est, 
+             w1 = dat_norm$target, 
+             days = 365*5 )
+
+start_time <- Sys.time()
+normal <- pmap_dfr(list, funScenario)%>% 
+  merge(., dat_norm, by = "X") %>% 
+  mutate(final_BMI_class = cut(bmi_final, 
+                               c(0, 18.5, 24.9, 29.9, 100), 
+                               labels = c("underweight", "normal", "overweight", "obese"))) %>% 
+  mutate(calRed = (newIntake - baseIntake)/baseIntake)
+
+end_time <- Sys.time()
+
+end_time - start_time
+
+beep(3)
+
+write_csv(normal, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_normal_weight_loss.csv")
+
+full <- rbind(normal, over, obese)
+
+write_csv(full, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_full_weight_loss.csv")
+
+
+
+=======
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
 # Summary statistics
 
 
@@ -485,4 +752,8 @@ scenario4 %>%
        x = "Daily kcal")
 
 write_csv(scenario4, "C:\\Users\\Elena.Mariani\\Documents\\Projects\\ahl_weight_loss_modelling\\Output\\hse_modelling_scenario_4.csv")
+<<<<<<< HEAD
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
+=======
+>>>>>>> c5da22913e5cd0b1e5050dc7decbd81518260d18
 

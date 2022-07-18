@@ -1,0 +1,734 @@
+---
+title: "HSE Subgroup Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(plotly)
+library(beepr)
+library(survey)
+library(scales)
+
+# Read flat file Health Survey data
+
+df <- read.csv("C:\\Users\\Elena.Mariani\\Documents\\Projects\\alh_user_personas\\Data\\calorie_deficit_scenarios_extended.csv", sep = ",", fileEncoding="UTF-8-BOM") %>% 
+  mutate(Age_group_2 = cut(Age_est, 
+                           breaks = c(16, 20, 30, 40, 50, 60, 200), 
+                           right = F,
+                           labels = c("16-19", "20-29", "30-39", "40-49", "50-59", "60 +"))) %>% 
+  mutate(educ = ifelse(topqual3 == 1 ,"Degree or higher", 
+                       ifelse(topqual3 %in% c(2,3), "A level or equivalent", 
+                              ifelse(topqual3 %in% c(4,5, 7), "GCSE or lower",
+                                     ifelse(topqual3 == 6, "Foreign",  NA))))) %>% 
+  mutate(work = case_when(Activb2 == 1 ~ "In Education",
+                          Activb2 %in% c(2,4) ~ "In Paid Employment/Self Employed",
+                          Activb2 %in% c(3,9) ~ "Unpaid Work (including carers)",
+                          Activb2 == 5 ~ "Unemployed",
+                          Activb2 %in% c(6,7) ~ "Long term illness",
+                          Activb2 == 8 ~ "Retired",
+                          Activb2 == 95 ~ "Other",
+                          TRUE ~ "Missing")) %>% 
+  mutate(region = case_when(GOR1 == 1 ~ "North East",
+                            GOR1 == 2 ~ "North West",
+                            GOR1 == 3 ~ "Yorkshire and the Humber",
+                            GOR1 == 4 ~ "East Midlands",
+                            GOR1 == 5 ~ "West Midlands",
+                            GOR1 == 6 ~ "East of England",
+                            GOR1 == 7 ~ "London",
+                            GOR1 == 8 ~ "South East",
+                            GOR1 == 9 ~ "South West",
+                            TRUE ~ "Missing"))
+
+# Declare survey design
+
+hse <- svydesign(id = ~X,
+          weights = ~sample_weight,
+          data = df)
+
+
+```
+
+This notebook contains analysis of adults (16 year old and above) from the 2019 Health Survey for England sample. Sample weights have been applied to all analysis. The purpose of this analysis is to gain an initial understanding of the profiles of individuals living with excess weight (overweight or obese) in England. 
+
+# Excess Weight Prevalence
+
+Overall, 35.5% of the adult population is classified as overweight, and 28.2% as obese. 
+
+```{r rate}
+# Calculate obesity rate
+
+tab <- svytable(~BMI_class, design = hse)
+
+# Add proportions to table
+tab_w <- tab %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+tab_w$BMI_class <- factor(tab_w$BMI_class, levels = c("underweight", "normal", "overweight", "obese"))
+
+# Create a barplot
+ggplot(data = tab_w, mapping = aes(x = BMI_class, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  coord_cartesian(ylim = c(0,0.7))
+
+# summary stats
+
+svyquantile(~Age_est, hse, quantile=c(0.5), ci=TRUE)
+svymean(~Age_est, hse)
+svyquantile(~BMI_est, hse, quantile=c(0.5), ci=TRUE)
+
+svytable(~Ethnicity, hse) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~educ, hse) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~work, hse) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~IMD_q, hse) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~region, hse) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+
+
+```
+
+## Gender
+
+There is a statistically significant association between gender and excess weight prevalence, with women over-represented in the obese category and men in the overweight category.
+
+```{r gender chi}
+chi_gender <- svychisq(~Sex+BMI_class, hse, statistic="adjWald")
+chi_gender
+```
+
+
+```{r gender}
+# gender
+
+tab_gender <- svytable(~BMI_class + Sex, design = hse)
+
+# Add proportions to table
+tab_w_gender <- tab_gender %>%
+  as.data.frame() %>%
+  group_by(BMI_class) %>% 
+  mutate(Prop = (Freq/sum(Freq))) 
+
+
+# comparison
+
+tab_gender_all <- svytable(~Sex, design = hse)
+
+tab_w_gender_all <- tab_gender_all %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq))) %>% 
+  mutate(BMI_class = "All")
+
+tab_w_gender_final <- rbind(tab_w_gender, tab_w_gender_all) 
+
+tab_w_gender_final$BMI_class <- factor(tab_w_gender_final$BMI_class, levels = c("underweight", "normal", "overweight", "obese", "All"))
+
+ tab_w_gender_final <- tab_w_gender_final %>% 
+   group_by(BMI_class) %>% 
+   arrange(Sex) %>% 
+   mutate(label_y = 1 - (cumsum(Prop) - 0.5 * Prop)) 
+
+# Create a barplot
+ggplot(data = tab_w_gender_final, mapping = aes(x = BMI_class, y = Prop, fill = Sex)) + 
+  geom_bar(stat = "identity") +
+  geom_text(aes(y = label_y, label = label_percent(1)(Prop)), size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  coord_cartesian(ylim = c(0,1))
+
+```
+
+## Ethnicity
+
+There is a statistically significant association between ethnicity and obesity with white people over-represented in the obese category.
+
+```{r ethnicity chi}
+chi_ethnicity <- svychisq(~Ethnicity+BMI_class, hse, statistic="adjWald")
+chi_ethnicity
+```
+
+
+```{r ethnicity}
+tab_ethn <- svytable(~BMI_class + Ethnicity, design = hse)
+
+# Add proportions to table
+tab_w_ethn <- tab_ethn %>%
+  as.data.frame() %>%
+  group_by(BMI_class) %>% 
+  mutate(Prop = (Freq/sum(Freq)))
+
+# comparison
+
+tab_ethn_all <- svytable(~Ethnicity, design = hse)
+
+tab_w_ethn_all <- tab_ethn_all %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq))) %>% 
+  mutate(BMI_class = "All")
+
+tab_w_ethn_final <- rbind(tab_w_ethn, tab_w_ethn_all)
+
+tab_w_ethn_final$BMI_class <- factor(tab_w_ethn_final$BMI_class, levels = c("underweight", "normal", "overweight", "obese", "All"))
+
+tab_w_ethn_final$Ethnicity <- factor(tab_w_ethn_final$Ethnicity, levels = c("Asian", "Black", "White", "Mixed", "Other"))
+
+tab_w_ethn_final <- tab_w_ethn_final %>% 
+  group_by(BMI_class) %>% 
+  arrange(Ethnicity) %>% 
+  mutate(label_y = 1 - (cumsum(Prop) - 0.5 * Prop))
+
+# Create a barplot
+ggplot(data = tab_w_ethn_final, mapping = aes(x = BMI_class, y = Prop, fill = Ethnicity)) + 
+  geom_bar(stat = "identity") +
+  geom_text(aes(y = label_y, label = label_percent(1)(Prop)), size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  coord_cartesian(ylim = c(0,1))
+```
+
+## Age group
+
+There is a statistically significant association between age and obesity with people aged 50+ being over-represented in the obese and overweight categories.
+
+```{r age chi}
+chi_age <- svychisq(~Age_group_2+BMI_class, hse, statistic="adjWald")
+chi_age
+```
+
+
+```{r age}
+# Age group
+
+tab_age <- svytable(~BMI_class + Age_group_2, design = hse)
+
+# Add proportions to table
+tab_w_age <- tab_age %>%
+  as.data.frame() %>%
+  group_by(BMI_class) %>% 
+  mutate(Prop = (Freq/sum(Freq)))
+
+# comparison
+
+tab_age_all <- svytable(~Age_group_2, design = hse)
+
+tab_w_age_all <- tab_age_all %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq))) %>% 
+  mutate(BMI_class = "All")
+
+tab_w_age_final <- rbind(tab_w_age, tab_w_age_all)
+
+tab_w_age_final$BMI_class <- factor(tab_w_age_final$BMI_class, levels = c("underweight", "normal", "overweight", "obese", "All"))
+
+tab_w_age_final <- tab_w_age_final %>% 
+  group_by(BMI_class) %>% 
+  arrange(Age_group_2) %>% 
+  mutate(label_y = 1 - (cumsum(Prop) - 0.5 * Prop))
+
+# Create a barplot
+ggplot(data = tab_w_age_final, mapping = aes(x = BMI_class, y = Prop, fill = Age_group_2)) + 
+  geom_bar(stat = "identity") +
+  geom_text(aes(y = label_y, label = label_percent(1)(Prop)), size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "", fill = "Age group")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  coord_cartesian(ylim = c(0,1))
+```
+
+## Deprivation
+
+There is a statistically significant association between deprivation and obesity with people in the lowest quintiles being over-represented in the obese category.
+
+```{r imd chi}
+chi_imd <- svychisq(~IMD_q+BMI_class, hse, statistic="adjWald")
+chi_imd
+```
+
+```{r IMD}
+
+# Deprivation
+
+tab_imd <- svytable(~BMI_class + IMD_q, design = hse)
+
+# Add proportions to table
+tab_w_imd <- tab_imd %>%
+  as.data.frame() %>%
+  group_by(BMI_class) %>% 
+  mutate(Prop = (Freq/sum(Freq)))
+
+# comparison
+
+tab_imd_all <- svytable(~IMD_q, design = hse)
+
+tab_w_imd_all <- tab_imd_all %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq))) %>% 
+  mutate(BMI_class = "All")
+
+tab_w_imd_final <- rbind(tab_w_imd, tab_w_imd_all)
+
+tab_w_imd_final$BMI_class <- factor(tab_w_imd_final$BMI_class, levels = c("underweight", "normal", "overweight", "obese", "All"))
+
+tab_w_imd_final <- tab_w_imd_final %>% 
+  group_by(BMI_class) %>% 
+  arrange(IMD_q) %>% 
+  mutate(label_y = 1 - (cumsum(Prop) - 0.5 * Prop))
+
+# Create a barplot
+ggplot(data = tab_w_imd_final, mapping = aes(x = BMI_class, y = Prop, fill = IMD_q)) + 
+  geom_bar(stat = "identity") +
+  geom_text(aes(y = label_y, label = label_percent(1)(Prop)), size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "", fill = "IMD quintile")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  coord_cartesian(ylim = c(0,1))
+```
+
+## Education
+
+```{r education chi}
+chi_educ <- svychisq(~educ+BMI_class, hse, statistic="adjWald")
+chi_educ
+```
+
+
+
+```{r education}
+# Education
+
+tab_educ <- svytable(~BMI_class + educ, design = hse)
+
+# Add proportions to table
+tab_w_educ <- tab_educ %>%
+  as.data.frame() %>%
+  group_by(BMI_class) %>% 
+  mutate(Prop = (Freq/sum(Freq)))
+
+# comparison
+
+tab_educ_all <- svytable(~educ, design = hse)
+
+tab_w_educ_all <- tab_educ_all %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq))) %>% 
+  mutate(BMI_class = "All")
+
+tab_w_educ_final <- rbind(tab_w_educ, tab_w_educ_all)
+
+tab_w_educ_final$BMI_class <- factor(tab_w_educ_final$BMI_class, levels = c("underweight", "normal", "overweight", "obese", "All"))
+
+tab_w_educ_final <- tab_w_educ_final %>% 
+  group_by(BMI_class) %>% 
+  arrange(educ) %>% 
+  mutate(label_y = 1 - (cumsum(Prop) - 0.5 * Prop))
+
+# Create a barplot
+ggplot(data = tab_w_educ_final, mapping = aes(x = BMI_class, y = Prop, fill = educ)) + 
+  geom_bar(stat = "identity") +
+  geom_text(aes(y = label_y, label = label_percent(1)(Prop)), size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "", fill = "Education")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  coord_cartesian(ylim = c(0,1))
+```
+
+# Profiling Excess Weight
+
+## Obese
+
+To profile the obese population I divide it in three sections, based on the percentiles of the BMI distribution (below 25%, between 26% and 75% and above 75%).
+
+```{r obese}
+obese <- df %>% filter(BMI_class == "obese")
+
+dens <- density(obese$BMI_est)
+dat <- data.frame(x=dens$x, y=dens$y)
+probs <- c(0, 0.25, 0.5, 0.75, 1)
+quantiles <- quantile(obese$BMI_est, prob=probs)
+dat$quant <- factor(findInterval(dat$x,quantiles))
+ggplot(dat, aes(x,y)) + 
+  geom_line() + 
+  geom_ribbon(aes(ymin=0, ymax=y, fill=quant)) + 
+  scale_x_continuous(breaks=quantiles) + 
+  scale_fill_brewer(guide="none") +
+  theme_bw() + 
+  labs(x = "BMI")
+
+
+```
+
+### Obese: the lower 25%
+
+```{r obese-low}
+obese_low <- obese %>% filter(BMI_est <= quantiles[[2]])
+
+# Declare survey design
+
+obese_low_dsg <- svydesign(id = ~X,
+          weights = ~sample_weight,
+          data = obese_low)
+
+# summary stats
+
+svyquantile(~Age_est, obese_low_dsg, quantile=c(0.5), ci=TRUE)
+svymean(~Age_est, obese_low_dsg)
+svyquantile(~BMI_est, obese_low_dsg, quantile=c(0.5), ci=TRUE)
+
+svytable(~Ethnicity, obese_low_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~educ, obese_low_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~work, obese_low_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~IMD_q, obese_low_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~region, obese_low_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+
+
+# Age group
+
+tab_age_low <- svytable(~Age_group_2, design = obese_low_dsg)
+
+# Add proportions to table
+tab_age_low_w <- tab_age_low %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_age_low_w, mapping = aes(x = Age_group_2, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Gender
+
+tab_gender_low <- svytable(~Sex, design = obese_low_dsg)
+
+# Add proportions to table
+tab_gender_low_w <- tab_gender_low %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_gender_low_w, mapping = aes(x = Sex, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Education
+
+tab_educ_low <- svytable(~educ, design = obese_low_dsg)
+
+# Add proportions to table
+tab_educ_low_w <- tab_educ_low %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_educ_low_w, mapping = aes(x = educ, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Ethnicity
+
+tab_ethn_low <- svytable(~Ethnicity, design = obese_low_dsg)
+
+# Add proportions to table
+tab_ethn_low_w <- tab_ethn_low %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_ethn_low_w, mapping = aes(x = Ethnicity, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Deprivation
+
+tab_imd_low <- svytable(~IMD_q, design = obese_low_dsg)
+
+# Add proportions to table
+tab_imd_low_w <- tab_imd_low %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_imd_low_w, mapping = aes(x = IMD_q, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Work
+
+tab_work_low <- svytable(~work, design = obese_low_dsg)
+
+# Add proportions to table
+tab_work_low_w <- tab_work_low %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_work_low_w, mapping = aes(x = work, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+### Obese: the mid 50%
+
+```{r obese-med}
+obese_med <- obese %>% filter(BMI_est > quantiles[[2]] & BMI_est <= quantiles[[4]])
+
+# Declare survey design
+
+obese_med_dsg <- svydesign(id = ~X,
+          weights = ~sample_weight,
+          data = obese_med)
+
+# summary stats
+
+svyquantile(~Age_est, obese_med_dsg, quantile=c(0.5), ci=TRUE)
+svymean(~Age_est, obese_med_dsg)
+
+svyquantile(~BMI_est, obese_med_dsg, quantile=c(0.5), ci=TRUE)
+
+svytable(~Ethnicity, obese_med_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~educ, obese_med_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~work, obese_med_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~IMD_q, obese_med_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~region, obese_med_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+
+# Age group
+
+tab_age_med <- svytable(~Age_group_2, design = obese_med_dsg)
+
+# Add proportions to table
+tab_age_med_w <- tab_age_med %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_age_med_w, mapping = aes(x = Age_group_2, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Gender
+
+tab_gender_med <- svytable(~Sex, design = obese_med_dsg)
+
+# Add proportions to table
+tab_gender_med_w <- tab_gender_med %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_gender_med_w, mapping = aes(x = Sex, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Education
+
+tab_educ_med <- svytable(~educ, design = obese_med_dsg)
+
+# Add proportions to table
+tab_educ_med_w <- tab_educ_med %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_educ_med_w, mapping = aes(x = educ, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Ethnicity
+
+tab_ethn_med <- svytable(~Ethnicity, design = obese_med_dsg)
+
+# Add proportions to table
+tab_ethn_med_w <- tab_ethn_med %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_ethn_med_w, mapping = aes(x = Ethnicity, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Deprivation
+
+tab_imd_med <- svytable(~IMD_q, design = obese_med_dsg)
+
+# Add proportions to table
+tab_imd_med_w <- tab_imd_med %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_imd_med_w, mapping = aes(x = IMD_q, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Work
+
+tab_work_med <- svytable(~work, design = obese_med_dsg)
+
+# Add proportions to table
+tab_work_med_w <- tab_work_med %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_work_med_w, mapping = aes(x = work, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+### Obese: the top 25%
+
+```{r obese-high}
+obese_high <- obese %>% filter(BMI_est > quantiles[[4]])
+
+# Declare survey design
+
+obese_high_dsg <- svydesign(id = ~X,
+          weights = ~sample_weight,
+          data = obese_high)
+
+# summary stats
+
+svyquantile(~Age_est, obese_high_dsg, quantile=c(0.5), ci=TRUE)
+svymean(~Age_est, obese_high_dsg)
+svyquantile(~BMI_est, obese_high_dsg, quantile=c(0.5), ci=TRUE)
+
+svytable(~Ethnicity, obese_high_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~educ, obese_high_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~work, obese_high_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~IMD_q, obese_high_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+svytable(~region, obese_high_dsg) %>% as.data.frame() %>% mutate(Prop = (Freq/sum(Freq)))
+
+
+# Age group
+
+tab_age_high <- svytable(~Age_group_2, design = obese_high_dsg)
+
+# Add proportions to table
+tab_age_high_w <- tab_age_high %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_age_high_w, mapping = aes(x = Age_group_2, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Gender
+
+tab_gender_high <- svytable(~Sex, design = obese_high_dsg)
+
+# Add proportions to table
+tab_gender_high_w <- tab_gender_high %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_gender_high_w, mapping = aes(x = Sex, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Education
+
+tab_educ_high <- svytable(~educ, design = obese_high_dsg)
+
+# Add proportions to table
+tab_educ_high_w <- tab_educ_high %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_educ_high_w, mapping = aes(x = educ, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Ethnicity
+
+tab_ethn_high <- svytable(~Ethnicity, design = obese_high_dsg)
+
+# Add proportions to table
+tab_ethn_high_w <- tab_ethn_high %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_ethn_high_w, mapping = aes(x = Ethnicity, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Deprivation
+
+tab_imd_high <- svytable(~IMD_q, design = obese_high_dsg)
+
+# Add proportions to table
+tab_imd_high_w <- tab_imd_high %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_imd_high_w, mapping = aes(x = IMD_q, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+
+# Work
+
+tab_work_high <- svytable(~work, design = obese_high_dsg)
+
+# Add proportions to table
+tab_work_high_w <- tab_work_high %>%
+  as.data.frame() %>%
+  mutate(Prop = (Freq/sum(Freq)))
+
+ggplot(data = tab_work_high_w, mapping = aes(x = work, y = Prop)) + 
+  geom_col(fill = "blue") +
+  geom_text(aes(label = label_percent()(Prop)), vjust = -0.3, size = 3.5) +
+  theme_bw() +
+  labs(x = "", y = "")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
