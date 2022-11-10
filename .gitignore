@@ -3,10 +3,6 @@
 .RData
 .Ruserdata
 
-# exclude /inputs and /outputs/data except top-level markdown
+# exclude /inputs and /outputs/data 
 /inputs/*
-!/inputs/*.md
-/outputs/data/*
-!/outputs/data/*.md
-/outputs/models/*
-!/outputs/models/*.md
+/outputs/*
