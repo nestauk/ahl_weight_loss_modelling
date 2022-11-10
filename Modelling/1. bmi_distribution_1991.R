@@ -5,6 +5,8 @@ library(fitur)
 library(actuar)
 library(here)
 
+# load cleaned 1991 file
+
 df <- read_csv(here("outputs/data/hse_1991_clean.csv"))
 
 # Explore BMI distribution 
