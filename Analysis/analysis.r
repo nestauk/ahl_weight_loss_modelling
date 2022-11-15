@@ -45,6 +45,34 @@ obese_df <- read_csv(here("outputs/data/obese_all_years.csv")) %>%
   mutate(intake_start = pal*rmr,
          intake_end = (pal*rmr) + ei)
 
+# overweight only
+
+over_df <- read_csv(here("outputs/data/over_3_year.csv"))%>%
+  merge(., dat, by = "id") %>% 
+  mutate(bmi_final = target/(height/100)^2) %>% 
+  mutate(bmi_class_final = case_when(bmi_final <= 18.5 ~ "underweight",
+                                     bmi_final > 18.5 & bmi_final < 25 ~ "normal",
+                                     bmi_final >= 25 & bmi_final < 30 ~ "overweight",
+                                     bmi_final >= 30 & bmi_final < 40 ~ "obese",
+                                     bmi_final >= 40 ~ "morbidly obese",
+                                     TRUE ~ "NA")) %>% 
+  mutate(intake_start = pal*rmr,
+         intake_end = (pal*rmr) + ei)
+
+# morbidly obese only
+
+morb_df <- read_csv(here("outputs/data/morb_3_year.csv"))%>%
+  merge(., dat, by = "id") %>% 
+  mutate(bmi_final = target/(height/100)^2) %>% 
+  mutate(bmi_class_final = case_when(bmi_final <= 18.5 ~ "underweight",
+                                     bmi_final > 18.5 & bmi_final < 25 ~ "normal",
+                                     bmi_final >= 25 & bmi_final < 30 ~ "overweight",
+                                     bmi_final >= 30 & bmi_final < 40 ~ "obese",
+                                     bmi_final >= 40 ~ "morbidly obese",
+                                     TRUE ~ "NA")) %>% 
+  mutate(intake_start = pal*rmr,
+         intake_end = (pal*rmr) + ei)
+
 # get rest of the population
 
 full <- rbind(read_csv(here("outputs/data/hse_2019_clean.csv")) %>% 
@@ -68,9 +96,32 @@ full <- rbind(read_csv(here("outputs/data/hse_2019_clean.csv")) %>%
   mutate(intake_start = pal*rmr,
          intake_end = (pal*rmr) + ei)
 
+full$bmi_class <- factor(full$bmi_class, levels = c("underweight", "normal", "overweight", "obese", "morbidly obese"))
+full$bmi_class_final <- factor(full$bmi_class_final, levels = c("underweight", "normal", "overweight", "obese", "morbidly obese"))
 
 
-# descriptive stats
+# descriptive stats - all
+rbind(full %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
+      full %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
+  group_by(sex, type) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  dcast(., sex ~ type) %>% 
+  arrange(sex) %>% 
+  mutate(diff = final - base,
+         perc = round(diff/base*100,1))
+
+# descriptive stats - excess weight
+rbind(full %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
+      full %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
+  filter(bmi_class %in% c("overweight", "obese", "morbidly obese")) %>% 
+  group_by(sex, type) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  dcast(., sex ~ type) %>% 
+  arrange(sex) %>% 
+  mutate(diff = final - base,
+         perc = round(diff/base*100,1))
+
+# descriptive stats - obese
 rbind(obese_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
       obese_df %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
   group_by(bmi_class, sex, type) %>% 
@@ -80,9 +131,29 @@ rbind(obese_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutat
   mutate(diff = final - base,
          perc = round(diff/base*100,1))
 
+# descriptive stats - overweight
+rbind(over_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
+      over_df %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
+  group_by(bmi_class, sex, type) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  dcast(., bmi_class + sex ~ type) %>% 
+  arrange(sex) %>% 
+  mutate(diff = final - base,
+         perc = round(diff/base*100,1))
+
+# descriptive stats - morbidly
+rbind(morb_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
+      morb_df %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
+  group_by(bmi_class, sex, type) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  dcast(., bmi_class + sex ~ type) %>% 
+  arrange(sex) %>% 
+  mutate(diff = final - base,
+         perc = round(diff/base*100,1))
+
 # descriptives for the difference
 
-obese_df %>% 
+full %>% 
   mutate(diff = intake_end - intake_start) %>% 
   group_by(bmi_class, sex) %>% 
   summarise(std = round(sqrt(wtd.var(diff, weight = wt_int)),1),
@@ -92,18 +163,9 @@ obese_df %>%
             perc75 = wtd.quantile(diff, probs = 0.75, weight = wt_int),
             iqr = perc75 - perc25)
 
-obese_df %>% 
-  group_by(sex) %>% 
-  summarise(std = round(sqrt(wtd.var(ei, weight = wt_int)),1),
-            min = min(ei),
-            max = max(ei),
-            perc25 = wtd.quantile(ei, probs = 0.25, weight = wt_int),
-            perc75 = wtd.quantile(ei, probs = 0.75, weight = wt_int),
-            iqr = perc75 - perc25)
-
-obese_df %>% 
+full %>% 
   mutate(calRed = ei/intake_start) %>% 
-  group_by(sex) %>% 
+  group_by(bmi_class, sex) %>% 
   summarise(std = round(sqrt(wtd.var(calRed, weight = wt_int)),1),
             min = min(calRed),
             max = max(calRed),
@@ -113,27 +175,47 @@ obese_df %>%
 
 # confidence interval
 
-dclus2 <- svydesign(id=~id, weights = ~wt_int, data=obese_df)
+dclus2 <- svydesign(id=~id, weights = ~wt_int, data=full)
 
-funDiff <- function(bmi_class_c, sex_c){
+funDiff_byBMI <- function(bmi_class_c, sex_c){
     sub <- subset(dclus2, sex == sex_c & bmi_class == bmi_class_c)
     tt<-svyttest(I(intake_end - intake_start)~0, sub)
     return(data.frame(sex = sex_c, bmi_class = bmi_class_c, confint(tt, level=0.95)))
-    }
+}
 
-list <- expand.grid(sex_c = unique(obese_df$sex), bmi_class_c = c("normal","overweight", "obese", "morb obese"))
+funDiff_excess <- function(sex_c){
+  sub <- subset(dclus2, sex == sex_c & bmi_class %in% c("overweight", "obese", "morbidly obese"))
+  tt<-svyttest(I(intake_end - intake_start)~0, sub)
+  return(data.frame(sex = sex_c, confint(tt, level=0.95)))
+}
 
-pmap_dfr(list, funDiff)  %>% arrange(sex)
+funDiff_all <- function(sex_c){
+  sub <- subset(dclus2, sex == sex_c)
+  tt<-svyttest(I(intake_end - intake_start)~0, sub)
+  return(data.frame(sex = sex_c, confint(tt, level=0.95)))
+}
+
+listBMI <- expand.grid(sex_c = unique(full$sex), bmi_class_c = c("underweight","normal","overweight", "obese", "morbidly obese"))
+
+pmap_dfr(listBMI, funDiff_byBMI)  %>% arrange(sex)
+
+listSex <- expand.grid(sex_c = unique(full$sex))
+
+pmap_dfr(listSex, funDiff_all)  %>% arrange(sex)
+
+pmap_dfr(listSex, funDiff_excess)  %>% arrange(sex)
+
 
 # Intake distribution
 
-obese_df %>% 
+full %>% 
+  filter(bmi_class %in% c("overweight", "obese", "morbidly obese")) %>% 
   dplyr::select(intake_start, intake_end, sex, wt_int, bmi_class) %>% 
   melt(., id.vars = c("sex", "wt_int", "bmi_class")) %>% 
   mutate(label = ifelse(variable == "intake_start", "2019", "Simulated 50% Reduction")) %>% 
   ggplot(., aes(x = value, group = label, color = label)) +
   stat_density(aes(weight = wt_int), adjust = 1, lwd = 2, geom = "line", position = "identity") +
-  facet_grid(sex ~ .) +
+  facet_grid(bmi_class  ~ sex) +
   labs(x = "kcal/day",
        color = "",
        title = "Distribution kcal/day") +
@@ -146,17 +228,17 @@ dev.off()
 
 # change in intake
 
-obese_df %>% 
+full %>% 
+  filter(bmi_class %in% c("overweight", "obese", "morbidly obese")) %>% 
   mutate(calRed = ei/intake_start) %>% 
-  mutate(sex = paste0("Obese ", sex, "s")) %>% 
   dplyr::select(calRed, sex, wt_int, bmi_class) %>% 
   ggplot(., aes(x = calRed, fill = bmi_class)) +
   stat_density(aes(weight = wt_int), adjust = 3, lwd = 2, geom = "line", position = "identity", color = "#0000FF") +
   scale_x_continuous(labels = scales::percent) +
-  facet_grid(sex ~ .) +
+  facet_grid(bmi_class ~ sex) +
   labs(x = "kcal/day",
        color = "",
-       title = "Distribution of Difference in kcal/day: Obese",
+       title = "Distribution of Difference in kcal/day",
        subtitle = "As a % of baseline intake") +
   theme_ipsum(base_size = 15, axis_title_size = 15, base_family="Averta")
 
@@ -435,18 +517,21 @@ df_comparison <- rbind(df_1991 %>%
 df_comparison$bmi_class <- factor(df_comparison$bmi_class_final, levels = c("underweight", "normal", "overweight", "obese", "morbidly obese"))
 
 plotA <- df_comparison %>% 
-  filter(bmi_class %in% c("obese")) %>% 
+  filter(bmi_class %in% c("overweight", "obese", "morbidly obese")) %>% 
   ggplot(., aes(x = bmi_final, color = year)) + 
 geom_density(aes(weight = wt_int), size = 2, adjust = 2, alpha = 0.5) +
 facet_grid(bmi_class ~ . ) +
 theme_ipsum() +
-labs(title = "Obese: BMI Distribution",
+labs(title = "BMI Distribution",
      color = "",
      x = "BMI")+
   xlim(20,60) +
   theme_ipsum(base_size = 15, axis_title_size = 15, base_family="Averta") +
 scale_color_manual(values=c("#0000FF", "#F6A4B7")) +
   theme(legend.position = "top")
+
+ggsave(here("outputs/figures/bmi_difference_1991.png"), width = 10, bg='#ffffff')
+dev.off()
 
 
 density_diff <- df_comparison %>% 
@@ -470,6 +555,6 @@ plotB <- ggplot(density_diff, aes(x, y)) +
 
 
 
-png(here("outputs/figures/intake_difference.png"), width = 1000)
+png(here("outputs/figures/bmi_difference_1991.png"), width = 1000)
 grid.arrange(plotA, plotB, ncol=2)
 dev.off()
