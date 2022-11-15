@@ -14,7 +14,12 @@ For further information about the model there are useful vignettes available by 
 browseVignettes("bw")
 ```
 
-Other packages required are listed in the `requirements.txt` file.
+After having installed the `bw` package run 
+
+```
+requirements.R
+```
+which automatically checks whether the packages needed for this analysis are installed and if they are not it installs them.
 
 ## Datasets
 
