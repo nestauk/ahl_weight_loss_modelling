@@ -21,6 +21,14 @@ requirements.R
 ```
 which automatically checks whether the packages needed for this analysis are installed and if they are not it installs them.
 
+## How to Run this Project
+
+After following the instructions highlighted in the Requirements section, run the scripts in the folders in this order:
+
+1. Data Cleaning
+2. Modelling
+3. Analysis
+
 ## Datasets
 
 This analysis is based on Health Survey for England data made available on the [UK Data Service](https://ukdataservice.ac.uk/) portal:
