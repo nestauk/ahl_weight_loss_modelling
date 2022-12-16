@@ -103,7 +103,7 @@ full$bmi_class_final <- factor(full$bmi_class_final, levels = c("underweight", "
 rbind(full %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
       full %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
   group_by(sex, type) %>% 
-  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),1)) %>% 
   dcast(., sex ~ type) %>% 
   arrange(sex) %>% 
   mutate(diff = final - base,
@@ -114,7 +114,7 @@ rbind(full %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(ty
       full %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
   filter(bmi_class %in% c("overweight", "obese", "morbidly obese")) %>% 
   group_by(sex, type) %>% 
-  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),1)) %>% 
   dcast(., sex ~ type) %>% 
   arrange(sex) %>% 
   mutate(diff = final - base,
@@ -124,7 +124,7 @@ rbind(full %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(ty
 rbind(obese_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
       obese_df %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
   group_by(bmi_class, sex, type) %>% 
-  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),1)) %>% 
   dcast(., bmi_class + sex ~ type) %>% 
   arrange(sex) %>% 
   mutate(diff = final - base,
@@ -134,7 +134,7 @@ rbind(obese_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutat
 rbind(over_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
       over_df %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
   group_by(bmi_class, sex, type) %>% 
-  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),1)) %>% 
   dcast(., bmi_class + sex ~ type) %>% 
   arrange(sex) %>% 
   mutate(diff = final - base,
@@ -144,7 +144,7 @@ rbind(over_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate
 rbind(morb_df %>% dplyr::select(bmi_class, sex, intake_start, wt_int) %>% mutate(type = "base") %>% rename(intake = intake_start),
       morb_df %>% dplyr::select(bmi_class, sex, intake_end, wt_int) %>% mutate(type = "final") %>% rename(intake = intake_end)) %>% 
   group_by(bmi_class, sex, type) %>% 
-  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  summarise(intakeM = round(wtd.mean(intake, weight = wt_int),1)) %>% 
   dcast(., bmi_class + sex ~ type) %>% 
   arrange(sex) %>% 
   mutate(diff = final - base,
@@ -232,8 +232,8 @@ full %>%
   mutate(calRed = ei/intake_start) %>% 
   dplyr::select(calRed, sex, wt_int, bmi_class) %>% 
   ggplot(., aes(x = calRed, fill = bmi_class)) +
-  stat_density(aes(weight = wt_int), adjust = 3, lwd = 2, geom = "line", position = "identity", color = "#0000FF") +
-  scale_x_continuous(labels = scales::percent) +
+  stat_density(aes(weight = wt_int), adjust = 3, lwd = 2, geom = "line", position = "identity", color = "#0F294A") +
+  scale_x_continuous(labels = scales::percent, limits = c(-0.2,-0.05)) +
   facet_grid(bmi_class ~ sex) +
   labs(x = "kcal/day",
        color = "",
@@ -526,8 +526,10 @@ labs(title = "BMI Distribution",
      x = "BMI")+
   xlim(20,60) +
   theme_ipsum(base_size = 15, axis_title_size = 15, base_family="Averta") +
-scale_color_manual(values=c("#0000FF", "#F6A4B7")) +
+scale_color_manual(values=c("#FDB633", "#F6A4B7")) +
   theme(legend.position = "top")
+
+plotA
 
 ggsave(here("outputs/figures/bmi_difference_1991.png"), width = 10, bg='#ffffff')
 dev.off()
@@ -554,6 +556,6 @@ plotB <- ggplot(density_diff, aes(x, y)) +
 
 
 
-png(here("outputs/figures/bmi_difference_1991.png"), width = 1000)
+png(here("outputs/figures/bmi_difference_1991_grid.png"), width = 1000)
 grid.arrange(plotA, plotB, ncol=2)
 dev.off()

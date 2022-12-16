@@ -9,10 +9,12 @@ library(furrr)
 library(tictoc)
 library(beepr)
 
+source(here("Modelling/find_EI.R"))
+
 
 # load 2019 data
 df_2019 <- read_csv(here("outputs/data/hse_2019_clean.csv")) %>% 
-  mutate(sex = ifelse(sex == 2 ,"female", "male"))
+  mutate(sex = ifelse(sex == 2 ,"female", "male")) 
 
 # mean weight change
 w_change <- read.csv(here("outputs/reports/weight_change_table_mean.csv")) %>% 
@@ -26,29 +28,6 @@ dat <- merge(df_2019, w_change, by.x = c("bmi_class", "sex"), by.y = c("bmi_clas
 # split data by bmi class
 dat_split <- split(dat, dat$bmi_class)
 
-# define function
-find_EI <- function(id, bw, ht, age, sex,weight_goal, days, ei_limit){
-  
-  deltaNA <- rep(0,days)
-  
-  #Build a function to uniroot solve
-  weight_solve_energy <- function(x){
-  
-  #Matrix of energy intake change for 365 days
-  deltaEI <- rep(x, days)
-  
-  #Estimate weight change. 
-  wtrajectory  <- adult_weight(bw, ht, age, sex, deltaEI, deltaNA, days = days)
-  
-  #Return weight by the end
-  wtrajectory$Body_Weight[days] -weight_goal
-  
-  }
-
-  #Energy interval for the solution
-  EI              <- c(-ei_limit, ei_limit)
-  return(data.frame(id, days, ei = uniroot(weight_solve_energy, interval = EI)$root))
-}
 
 # 1 year
 all_obese1 <- list(id = dat_split$obese$id,
@@ -58,7 +37,8 @@ all_obese1 <- list(id = dat_split$obese$id,
                    sex = dat_split$obese$sex,
                    weight_goal = dat_split$obese$target,
                    days = 365*1,
-                   ei_limit = 1000) %>% 
+                   ei_limit = 1000,
+                   pal = 1.6) %>% 
   pmap_dfr(., find_EI)
 
 # 3 years
@@ -69,7 +49,8 @@ all_obese3 <- list(id = dat_split$obese$id,
                    sex = dat_split$obese$sex,
                    weight_goal = dat_split$obese$target,
                    days = 365*3,
-                   ei_limit = 1000) %>% 
+                   ei_limit = 1000,
+                   pal = 1.6) %>% 
   pmap_dfr(., find_EI) 
 
 # 5 years
@@ -80,7 +61,8 @@ all_obese5 <- list(id = dat_split$obese$id,
                    sex = dat_split$obese$sex,
                    weight_goal = dat_split$obese$target,
                    days = 365*5,
-                   ei_limit = 1000) %>% 
+                   ei_limit = 1000,
+                   pal = 1.6) %>% 
   pmap_dfr(., find_EI) 
 
 # 10 years
@@ -91,7 +73,8 @@ all_obese10 <- list(id = dat_split$obese$id,
                    sex = dat_split$obese$sex,
                    weight_goal = dat_split$obese$target,
                    days = 365*10,
-                   ei_limit = 1000) %>% 
+                   ei_limit = 1000,
+                   pal = 1.6) %>% 
   pmap_dfr(., find_EI) 
 
 # combine all

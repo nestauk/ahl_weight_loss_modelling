@@ -1,7 +1,6 @@
 rm(list = ls())
 
 library(tidyverse)
-library(plotly)
 library(reshape2)
 library(hrbrthemes)
 library(fitdistrplus)
@@ -81,6 +80,33 @@ df_1991 %>%
 df_1991_m <- df_1991 %>% filter(sex == "1")
 df_1991_f <- df_1991 %>% filter(sex == "2")
 
+# age standardisation
+
+# calculate age distribution in 1991-92
+
+ageDist1991 <- df_1991 %>% 
+  mutate(age_gr = cut(age, breaks = c(0,20,30,40,50,60,70,80,1000))) %>% 
+  group_by(age_gr) %>% 
+  count() %>% 
+  rename(n1991 = n)
+
+# calculate age specific BMI class distribution
+
+ageSt2019 <- df_2019 %>% 
+  mutate(age_gr = cut(age, breaks = c(0,20,30,40,50,60,70,80,1000))) %>% 
+  group_by(age_gr, bmi_class) %>% 
+  summarise(n = sum(wt_int)) %>% 
+  group_by(age_gr) %>% 
+  mutate(perc = n/sum(n))
+
+ageStBMI <- merge(ageSt2019, ageDist1991, by = "age_gr") %>% 
+  mutate(st = perc*n1991) %>% 
+  group_by(bmi_class) %>% 
+  summarise(sum = sum(st)) %>% 
+  ungroup() %>% 
+  mutate(perc = sum/sum(sum))
+
+write_csv(ageStBMI, here("outputs/reports/age_standardised_2019_bmi.csv"))
 
 
 # MALES
@@ -116,12 +142,12 @@ ggplot() +
        color = "",
        title = "BMI Distribution - Males") +
   theme_ipsum(base_size = 15, axis_title_size = 15, base_family="Averta") +
-  scale_color_manual(values=c("#0000FF", "#F6A4B7")) +
+  scale_color_manual(values=c("#FDB633", "#0000FF")) +
   scale_fill_manual(values = rev(gray.colors(5))) +
   guides(fill = "none")
 
 ggsave(here("outputs/figures/bmi_male.png"), width = 10, bg='#ffffff')
-dev.off()
+while (!is.null(dev.list()))  while (!is.null(dev.list()))  dev.off()
 
   
 # FEMALES
@@ -147,12 +173,12 @@ ggplot() +
        color = "",
        title = "BMI Distribution - Females") +
   theme_ipsum(base_size = 15, axis_title_size = 15, base_family="Averta") +
-  scale_color_manual(values=c("#0000FF", "#F6A4B7")) +
+  scale_color_manual(values=c("#FDB633", "#0000FF")) +
   scale_fill_manual(values = rev(gray.colors(5))) +
   guides(fill = "none")
 
 ggsave(here("outputs/figures/bmi_female.png"), width = 10, bg='#ffffff')
-dev.off()
+while (!is.null(dev.list()))  dev.off()
 
 
 # equipercentile equating
@@ -205,7 +231,13 @@ ggplot(., aes(x = intake, group = type, color = type)) +
        title = "Calculated kcal/day") +
   xlim(1500,4000) +
   theme_ipsum(base_size = 15, axis_title_size = 15, base_family="Averta") +
-  scale_color_manual(values=c("#0000FF", "#F6A4B7")) 
+  scale_color_manual(values=c("#FDB633", "#0000FF")) 
+
+plot1
+
+
+ggsave(here("outputs/figures/intake_diff_density.png"), width = 10, bg='#ffffff')
+while (!is.null(dev.list()))  dev.off()
 
 
 density_diff <- rbind(
@@ -243,7 +275,7 @@ plot2 <- ggplot(density_diff, aes(x, y)) +
 
 png(here("outputs/figures/intake_difference.png"), width = 1000)
 grid.arrange(plot1, plot2, ncol=2)
-dev.off()
+while (!is.null(dev.list()))  dev.off()
 
 
 # create tables for report
@@ -279,7 +311,7 @@ all %>%
 
 all %>% 
   group_by(bmi_class, type, sex) %>% 
-  summarise(intakem = round(wtd.mean(intake, weight = wt_int),0)) %>% 
+  summarise(intakem = round(wtd.mean(intake, weight = wt_int),1)) %>% 
   dcast(., bmi_class ~ type + sex, value.var = "intakem") %>% 
   mutate(diff_f = `2019_2` - `1991-92_2`,
          diff_m = `2019_1` - `1991-92_1`,
@@ -288,11 +320,34 @@ all %>%
   dplyr::select(bmi_class, `1991-92_1`, `2019_1`, `diff_m`, `perc_m`,`1991-92_2`, `2019_2`, `diff_f`, `perc_f`) %T>% 
   write_csv(here("outputs/reports/mean_intake.csv"))
 
+all %>% 
+  group_by(type, sex) %>% 
+  summarise(intakem = round(wtd.mean(intake, weight = wt_int),1)) %>% 
+  dcast(. , . ~ type + sex, value.var = "intakem") %>% 
+  mutate(diff_f = `2019_2` - `1991-92_2`,
+         diff_m = `2019_1` - `1991-92_1`,
+         perc_f = round(diff_f/`1991-92_2`*100,1),
+         perc_m = round(diff_m/`1991-92_2`*100,1)) %>% 
+  dplyr::select( `1991-92_1`, `2019_1`, `diff_m`, `perc_m`,`1991-92_2`, `2019_2`, `diff_f`, `perc_f`) %T>% 
+  write_csv(here("outputs/reports/mean_intake_population.csv"))
+
+all %>% 
+  filter(bmi_class %in% c("overweight", "obese", "morbidly obese")) %>% 
+  group_by(type, sex) %>% 
+  summarise(intakem = round(wtd.mean(intake, weight = wt_int),1)) %>% 
+  dcast(. , . ~ type + sex, value.var = "intakem") %>% 
+  mutate(diff_f = `2019_2` - `1991-92_2`,
+         diff_m = `2019_1` - `1991-92_1`,
+         perc_f = round(diff_f/`1991-92_2`*100,1),
+         perc_m = round(diff_m/`1991-92_2`*100,1)) %>% 
+  dplyr::select( `1991-92_1`, `2019_1`, `diff_m`, `perc_m`,`1991-92_2`, `2019_2`, `diff_f`, `perc_f`) %T>% 
+  write_csv(here("outputs/reports/mean_intake_excess_weight.csv"))
+
 # standard deviation
 
 all %>% 
   group_by(bmi_class, type, sex) %>% 
-  summarise(intakem = round(sqrt(wtd.var(intake, weight = wt_int)),0)) %>% 
+  summarise(intakem = round(sqrt(wtd.var(intake, weight = wt_int)),1)) %>% 
   dcast(., bmi_class ~ type + sex, value.var = "intakem") %>% 
   dplyr::select(bmi_class, `1991-92_1`, `2019_1`,`1991-92_2`, `2019_2`) %T>% 
   write_csv(here("outputs/reports/sd_intake.csv"))
